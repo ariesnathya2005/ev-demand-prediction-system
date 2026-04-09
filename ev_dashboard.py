@@ -174,6 +174,8 @@ def load_or_train_model():
     return rf
 
 model = load_or_train_model()
+MODEL_FEATURES = int(getattr(model, "n_features_in_", 4))
+USES_STATION_FEATURE = MODEL_FEATURES >= 5
 
 DOW_NAMES = {0:"Mon",1:"Tue",2:"Wed",3:"Thu",4:"Fri",5:"Sat",6:"Sun"}
 
@@ -181,6 +183,15 @@ def classify(val):
     if val >= 35:   return "High",   "#ef4444"
     elif val >= 20: return "Medium", "#f59e0b"
     else:           return "Low",    "#10b981"
+
+def build_input(hour_v, day_v, month_v, dow_v, station_v):
+    row = [hour_v, day_v, month_v, dow_v]
+    if USES_STATION_FEATURE:
+        row.append(int(station_v))
+    return np.array([row], dtype=float)
+
+def predict_demand(hour_v, day_v, month_v, dow_v, station_v):
+    return float(model.predict(build_input(hour_v, day_v, month_v, dow_v, station_v))[0])
 
 # matplotlib dark defaults
 plt.rcParams.update({
@@ -235,8 +246,7 @@ if "pred" not in st.session_state:
     st.session_state.pred = None
 
 if predict_btn:
-    X_in = np.array([[hour, day, month, dow, int(station_id)]])
-    st.session_state.pred = float(model.predict(X_in)[0])
+    st.session_state.pred = predict_demand(hour, day, month, dow, station_id)
 
 pred = st.session_state.pred
 
@@ -325,7 +335,7 @@ with tab1:
     st.caption("Predicted charging demand across all 24 hours for the selected day configuration.")
 
     hrs    = np.arange(0, 24)
-    h_pred = [float(model.predict([[h, day, month, dow, int(station_id)]])[0]) for h in hrs]
+    h_pred = [predict_demand(h, day, month, dow, station_id) for h in hrs]
     dot_c  = ["#ef4444" if v >= 35 else "#f59e0b" if v >= 20 else "#10b981" for v in h_pred]
 
     fig, ax = plt.subplots(figsize=(11, 4))
@@ -358,10 +368,7 @@ with tab1:
     st.markdown("<br>", unsafe_allow_html=True)
     st.markdown('<div class="section-title">Weekly Demand Pattern</div>', unsafe_allow_html=True)
 
-    w_pred = [
-        float(model.predict([[hour, day, month, d, int(station_id)]])[0])
-        for d in range(7)
-    ]
+    w_pred = [predict_demand(hour, day, month, d, station_id) for d in range(7)]
     bar_c = ["#ef4444" if v >= 35 else "#f59e0b" if v >= 20 else "#10b981" for v in w_pred]
 
     fig2, ax2 = plt.subplots(figsize=(8, 3.5))
@@ -390,14 +397,15 @@ with tab2:
         np.random.randint(1, 32, n_t),
         np.random.randint(1, 13, n_t),
         np.random.randint(0,  7, n_t),
-        np.random.randint(1, 11, n_t),
     ])
+    if USES_STATION_FEATURE:
+        Xt = np.column_stack([Xt, np.random.randint(1, 11, n_t)])
     yt = (
         15
         + 10 * np.sin(np.pi * Xt[:, 0] / 12)
         + 5  * (Xt[:, 3] >= 5).astype(int)
         + 3  * np.random.randn(n_t)
-        + 0.5 * Xt[:, 4]
+        + (0.5 * Xt[:, 4] if USES_STATION_FEATURE else 0)
     ).clip(0, 60)
     yp = model.predict(Xt)
 
@@ -431,7 +439,9 @@ with tab2:
 
     with cb:
         st.markdown('<div class="section-title">Feature Importance</div>', unsafe_allow_html=True)
-        feats = ["Hour", "Day", "Month", "Day of Week", "Station ID"]
+        feats = ["Hour", "Day", "Month", "Day of Week"]
+        if USES_STATION_FEATURE:
+            feats.append("Station ID")
         imp   = model.feature_importances_
         idx   = np.argsort(imp)
         fig4, ax4 = plt.subplots(figsize=(5.5, 4.5))
