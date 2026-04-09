@@ -444,14 +444,12 @@ with tab2:
         np.random.randint(1, 32, n_test),
         np.random.randint(1, 13, n_test),
         np.random.randint(0,  7, n_test),
-        np.random.randint(1, 11, n_test),
     ])
     y_test = (
         15
         + 10 * np.sin(np.pi * X_test[:, 0] / 12)
         + 5  * (X_test[:, 3] >= 5).astype(int)
         + 3  * np.random.randn(n_test)
-        + 0.5 * X_test[:, 4]
     ).clip(0, 60)
     y_pred_test = model.predict(X_test)
 
