@@ -176,6 +176,7 @@ def load_or_train_model():
 model = load_or_train_model()
 MODEL_FEATURES = int(getattr(model, "n_features_in_", 4))
 USES_STATION_FEATURE = MODEL_FEATURES >= 5
+BUILD_TAG = "2026-04-09-fix2"
 
 DOW_NAMES = {0:"Mon",1:"Tue",2:"Wed",3:"Thu",4:"Fri",5:"Sat",6:"Sun"}
 
@@ -184,14 +185,34 @@ def classify(val):
     elif val >= 20: return "Medium", "#f59e0b"
     else:           return "Low",    "#10b981"
 
-def build_input(hour_v, day_v, month_v, dow_v, station_v):
+def build_input(hour_v, day_v, month_v, dow_v, station_v, with_station):
     row = [hour_v, day_v, month_v, dow_v]
-    if USES_STATION_FEATURE:
+    if with_station:
         row.append(int(station_v))
     return np.array([row], dtype=float)
 
 def predict_demand(hour_v, day_v, month_v, dow_v, station_v):
-    return float(model.predict(build_input(hour_v, day_v, month_v, dow_v, station_v))[0])
+    x4 = build_input(hour_v, day_v, month_v, dow_v, station_v, with_station=False)
+    x5 = build_input(hour_v, day_v, month_v, dow_v, station_v, with_station=True)
+    ordered_inputs = [x5, x4] if USES_STATION_FEATURE else [x4, x5]
+    last_error = None
+    for x in ordered_inputs:
+        try:
+            return float(model.predict(x)[0])
+        except ValueError as err:
+            last_error = err
+    raise last_error
+
+def predict_batch(x4, station_col):
+    x5 = np.column_stack([x4, station_col])
+    ordered_inputs = [x5, x4] if USES_STATION_FEATURE else [x4, x5]
+    last_error = None
+    for x in ordered_inputs:
+        try:
+            return model.predict(x)
+        except ValueError as err:
+            last_error = err
+    raise last_error
 
 # matplotlib dark defaults
 plt.rcParams.update({
@@ -238,6 +259,7 @@ station_id = st.sidebar.number_input(
     "📍 Station ID", min_value=1, max_value=50, value=1, step=1
 )
 st.sidebar.markdown(f"**Selected:** {DOW_NAMES[dow]}, {hour:02d}:00  |  Month {month}")
+st.sidebar.caption(f"Build: {BUILD_TAG}")
 st.sidebar.markdown("---")
 predict_btn = st.sidebar.button("🚀 Predict Demand")
 
@@ -392,22 +414,21 @@ with tab2:
     # reproducible test set
     np.random.seed(99)
     n_t = 500
-    Xt  = np.column_stack([
+    Xt4 = np.column_stack([
         np.random.randint(0, 24, n_t),
         np.random.randint(1, 32, n_t),
         np.random.randint(1, 13, n_t),
         np.random.randint(0,  7, n_t),
     ])
-    if USES_STATION_FEATURE:
-        Xt = np.column_stack([Xt, np.random.randint(1, 11, n_t)])
+    station_col = np.random.randint(1, 11, n_t)
     yt = (
         15
-        + 10 * np.sin(np.pi * Xt[:, 0] / 12)
-        + 5  * (Xt[:, 3] >= 5).astype(int)
+        + 10 * np.sin(np.pi * Xt4[:, 0] / 12)
+        + 5  * (Xt4[:, 3] >= 5).astype(int)
         + 3  * np.random.randn(n_t)
-        + (0.5 * Xt[:, 4] if USES_STATION_FEATURE else 0)
+        + (0.5 * station_col if USES_STATION_FEATURE else 0)
     ).clip(0, 60)
-    yp = model.predict(Xt)
+    yp = predict_batch(Xt4, station_col)
 
     mae  = mean_absolute_error(yt, yp)
     rmse = float(np.sqrt(mean_squared_error(yt, yp)))
@@ -439,10 +460,12 @@ with tab2:
 
     with cb:
         st.markdown('<div class="section-title">Feature Importance</div>', unsafe_allow_html=True)
-        feats = ["Hour", "Day", "Month", "Day of Week"]
-        if USES_STATION_FEATURE:
-            feats.append("Station ID")
         imp   = model.feature_importances_
+        feats = ["Hour", "Day", "Month", "Day of Week"]
+        if len(imp) >= 5:
+            feats.append("Station ID")
+        if len(feats) != len(imp):
+            feats = [f"Feature {i+1}" for i in range(len(imp))]
         idx   = np.argsort(imp)
         fig4, ax4 = plt.subplots(figsize=(5.5, 4.5))
         bh = ax4.barh(
