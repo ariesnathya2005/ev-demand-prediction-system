@@ -59,19 +59,31 @@ with col4:
     dayofweek = st.slider("Day of Week", 0, 6, 3, help="0=Mon, 6=Sun")
 
 # -------------------------------
-# PREDICTION & WARNINGS
+# PREDICTION, SPINNER, & WARNINGS
 # -------------------------------
 if st.button("Predict Demand"):
-    features = np.array([[hour, day, month, dayofweek]])
-    prediction = model.predict(features)[0]
+    try:
+        with st.spinner("Predicting demand..."):
+            features = np.array([[hour, day, month, dayofweek]])
+            prediction = model.predict(features)[0]
 
-    st.success(f"🔋 **Predicted Charging Demand: {prediction:.2f}**")
+        st.success(f"🔋 **Predicted Charging Demand: {prediction:.2f}**")
 
-    # Peak Demand Detection
-    if prediction > np.percentile(df['demand'], 75):
-        st.error("🚨 Peak Demand Expected!")
-    else:
-        st.success("✅ Normal Demand")
+        st.write("### 📊 Demand Level")
+        
+        # Calculate thresholds dynamically from original data
+        low_thresh = np.percentile(df['demand'], 33)
+        high_thresh = np.percentile(df['demand'], 66)
+
+        if prediction < low_thresh:
+            st.info("📉 Low Demand")
+        elif prediction < high_thresh:
+            st.warning("📊 Moderate Demand")
+        else:
+            st.error("🚨 High Demand (Peak Time)")
+            
+    except Exception as e:
+        st.error("⚠️ Error in prediction. Check inputs.")
 
 st.markdown("---")
 
@@ -109,6 +121,24 @@ st.pyplot(fig2)
 st.markdown("---")
 
 # -------------------------------
+# FEATURE IMPORTANCE (WOW FACTOR)
+# -------------------------------
+st.subheader("🌟 Feature Importance")
+st.write("Shows which factors affect charging demand the most:")
+
+importance = model.feature_importances_
+features_names = ["hour", "day", "month", "dayofweek"]
+
+df_imp = pd.DataFrame({
+    "Feature": features_names,
+    "Importance": importance
+}).sort_values(by="Importance", ascending=False)
+
+st.bar_chart(df_imp.set_index("Feature"))
+
+st.markdown("---")
+
+# -------------------------------
 # MODEL PERFORMANCE ANALYSIS
 # -------------------------------
 st.subheader("📊 Model Performance Analysis")
@@ -122,7 +152,6 @@ y_pred = model.predict(X_sample)
 # Plot Actual vs Predicted
 fig3, ax3 = plt.subplots(figsize=(6, 5))
 ax3.scatter(y_actual, y_pred, alpha=0.7, color='purple')
-# Add a diagonal line to see perfect predictions easily
 ax3.plot([y_actual.min(), y_actual.max()], [y_actual.min(), y_actual.max()], 'r--')
 ax3.set_xlabel("Actual Demand")
 ax3.set_ylabel("Predicted Demand")
@@ -139,3 +168,15 @@ st.write("### 📈 Model Metrics")
 st.write(f"- **MAE:** {mae:.2f}")
 st.write(f"- **RMSE:** {rmse:.2f}")
 st.write(f"- **R² Score:** {r2:.2f}")
+
+st.markdown("---")
+
+# -------------------------------
+# REAL-WORLD INSIGHTS
+# -------------------------------
+st.subheader("📌 Real-World Insights")
+st.write("""
+- **Peak demand** occurs during specific evening/morning hours when users plug in.
+- **Day of the week** typically shows varying charging usage based on commuter patterns.
+- Demand varies significantly by **time patterns**, making Temporal Features the strongest predictors.
+""")
