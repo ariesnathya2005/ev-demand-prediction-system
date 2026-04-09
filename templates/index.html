@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>EV Demand Prediction</title>
+</head>
+<body style="font-family: Arial, sans-serif; margin: 20px;">
+    <h2>EV Charging Demand Predictor</h2>
+
+    <form action="/predict" method="post">
+        Hour (0-23): <input type="number" name="hour" required min="0" max="23"><br><br>
+        Day (1-31): <input type="number" name="day" required min="1" max="31"><br><br>
+        Month (1-12): <input type="number" name="month" required min="1" max="12"><br><br>
+        <button type="submit">Predict</button>
+    </form>
+
+    {% if result %}
+        <h3 style="color: blue;">Predicted Charging Demand: {{ result }}</h3>
+    {% endif %}
+
+    <hr style="margin-top: 30px;">
+    
+    <h2>Data Visualization (Demand vs Time)</h2>
+    <img src="{{ url_for('static', filename='plot.png') }}" alt="Demand vs Time" style="max-width: 100%; border: 1px solid #ccc;">
+
+</body>
+</html>
