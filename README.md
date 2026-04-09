@@ -1,5 +1,7 @@
 # ⚡ EV Charging Demand Prediction System
 
+[![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://ev-demand-prediction-system.onrender.com)
+
 A full-stack Machine Learning web application built to predict Electric Vehicle (EV) charging demand based on temporal features. The project uses a Random Forest Regressor to provide accurate, real-time load predictions and features a highly customized, responsive Streamlit dashboard.
 
 ## 🌟 Key Features
@@ -54,7 +56,7 @@ The app will automatically open in your browser at `http://localhost:8501`.
 
 This application is fully compatible with PaaS providers like **Render**.
 
-**Live Demo:** [https://ev-demand-prediction-system.onrender.com](https://ev-demand-prediction-system.onrender.com)
+**Live Streamlit App:** [https://ev-demand-prediction-system.onrender.com](https://ev-demand-prediction-system.onrender.com)
 
 **Deployment Steps (Render):**
 1. Connect your GitHub repository to Render.
