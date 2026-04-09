@@ -1,51 +1,58 @@
-from flask import Flask, request, jsonify, render_template
+import streamlit as st
 import joblib
 import numpy as np
 import pandas as pd
-import matplotlib
-matplotlib.use('Agg')  # Use non-interactive backend to generate images
 import matplotlib.pyplot as plt
-import os
 
-app = Flask(__name__)
-model = joblib.load("model.pkl")
+# Page Config
+st.set_page_config(page_title="EV Demand Prediction", layout="centered")
 
-def generate_visualization():
+st.title("⚡ EV Charging Demand Predictor")
+
+# Load compiled model
+@st.cache_resource
+def load_model():
+    return joblib.load("model.pkl")
+
+model = load_model()
+
+# Form Inputs
+st.header("Make a Prediction")
+col1, col2, col3 = st.columns(3)
+
+with col1:
+    hour = st.number_input("Hour (0-23)", min_value=0, max_value=23, value=12)
+with col2:
+    day = st.number_input("Day (1-31)", min_value=1, max_value=31, value=15)
+with col3:
+    month = st.number_input("Month (1-12)", min_value=1, max_value=12, value=6)
+
+# Prediction Button
+if st.button("Predict"):
+    features = np.array([[hour, day, month]])
+    prediction = model.predict(features)
+    st.success(f"### Predicted Charging Demand: {round(prediction[0], 2)}")
+
+st.markdown("---")
+
+# Data Visualization
+st.header("📊 Data Visualization (Demand vs Time)")
+
+@st.cache_data
+def get_chart_data():
     df = pd.read_csv("ev_data.csv")
     df['timestamp'] = pd.to_datetime(df['timestamp'])
     df['hour'] = df['timestamp'].dt.hour
-    
-    # Calculate average demand per hour
-    hourly_demand = df.groupby('hour')['demand'].mean()
-    
-    plt.figure(figsize=(10, 5))
-    plt.plot(hourly_demand.index, hourly_demand.values, color='b', marker='o')
-    plt.title("Average EV Charging Demand vs Time (Hour of Day)")
-    plt.xlabel("Hour of Day (0-23)")
-    plt.ylabel("Average Charging Demand")
-    plt.grid(True)
-    
-    os.makedirs("static", exist_ok=True)
-    plt.savefig("static/plot.png")
-    plt.close()
+    return df.groupby('hour')['demand'].mean()
 
-# Generate the plot once when the app starts
-generate_visualization()
+hourly_demand = get_chart_data()
 
-@app.route("/")
-def home():
-    return render_template("index.html")
+fig, ax = plt.subplots(figsize=(10, 5))
+ax.plot(hourly_demand.index, hourly_demand.values, color='b', marker='o')
+ax.set_title("Average EV Charging Demand vs Time (Hour of Day)")
+ax.set_xlabel("Hour of Day (0-23)")
+ax.set_ylabel("Average Charging Demand")
+ax.grid(True)
 
-@app.route("/predict", methods=["POST"])
-def predict():
-    hour = int(request.form["hour"])
-    day = int(request.form["day"])
-    month = int(request.form["month"])
-
-    features = np.array([[hour, day, month]])
-    prediction = model.predict(features)
-
-    return render_template("index.html", result=round(prediction[0], 2))
-
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5001)
+# Render plot in Streamlit
+st.pyplot(fig)
