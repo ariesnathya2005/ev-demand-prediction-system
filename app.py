@@ -18,7 +18,7 @@ model = load_model()
 
 # Form Inputs
 st.header("Make a Prediction")
-col1, col2, col3 = st.columns(3)
+col1, col2, col3, col4 = st.columns(4)
 
 with col1:
     hour = st.number_input("Hour (0-23)", min_value=0, max_value=23, value=12)
@@ -26,10 +26,12 @@ with col2:
     day = st.number_input("Day (1-31)", min_value=1, max_value=31, value=15)
 with col3:
     month = st.number_input("Month (1-12)", min_value=1, max_value=12, value=6)
+with col4:
+    dayofweek = st.number_input("Day of Week (0-6)", min_value=0, max_value=6, value=2, help="0=Monday, 6=Sunday")
 
 # Prediction Button
 if st.button("Predict"):
-    features = np.array([[hour, day, month]])
+    features = np.array([[hour, day, month, dayofweek]])
     prediction = model.predict(features)
     st.success(f"### Predicted Charging Demand: {round(prediction[0], 2)}")
 
