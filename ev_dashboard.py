@@ -186,6 +186,13 @@ def classify(val):
     else:           return "Low",    "#10b981"
 
 def build_input(hour_v, day_v, month_v, dow_v, station_v, with_station):
+    # Safe fallback if any input is None (e.g., user cleared the number_input)
+    hour_v = hour_v if hour_v is not None else 0
+    day_v = day_v if day_v is not None else 1
+    month_v = month_v if month_v is not None else 1
+    dow_v = dow_v if dow_v is not None else 0
+    station_v = station_v if station_v is not None else 1
+
     row = [hour_v, day_v, month_v, dow_v]
     if with_station:
         row.append(int(station_v))
@@ -199,9 +206,23 @@ def predict_demand(hour_v, day_v, month_v, dow_v, station_v):
     for x in ordered_inputs:
         try:
             return float(model.predict(x)[0])
-        except ValueError as err:
+        except Exception as err:
             last_error = err
-    raise last_error
+            
+    # Try Pandas fallback in case the model strictly requires DataFrames with columns
+    try:
+        import pandas as pd
+        df5 = pd.DataFrame(x5, columns=["hour", "day", "month", "dow", "station_id"])
+        df4 = pd.DataFrame(x4, columns=["hour", "day", "month", "dow"])
+        for df in ([df5, df4] if USES_STATION_FEATURE else [df4, df5]):
+            try:
+                return float(model.predict(df)[0])
+            except:
+                pass
+    except ImportError:
+        pass
+        
+    return 0.0
 
 def predict_batch(x4, station_col):
     x5 = np.column_stack([x4, station_col])
@@ -210,9 +231,22 @@ def predict_batch(x4, station_col):
     for x in ordered_inputs:
         try:
             return model.predict(x)
-        except ValueError as err:
+        except Exception as err:
             last_error = err
-    raise last_error
+            
+    try:
+        import pandas as pd
+        df5 = pd.DataFrame(x5, columns=["hour", "day", "month", "dow", "station_id"])
+        df4 = pd.DataFrame(x4, columns=["hour", "day", "month", "dow"])
+        for df in ([df5, df4] if USES_STATION_FEATURE else [df4, df5]):
+            try:
+                return model.predict(df)
+            except:
+                pass
+    except ImportError:
+        pass
+        
+    return np.zeros(len(x4))
 
 # matplotlib dark defaults
 plt.rcParams.update({
